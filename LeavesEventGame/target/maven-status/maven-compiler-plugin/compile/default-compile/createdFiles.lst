@@ -1,8 +1,0 @@
-org\leavesEventGame\LeavesEventGame.class
-org\leavesEventGame\game\MyMiniGame.class
-org\leavesEventGame\commands\SetArenaCommand.class
-org\leavesEventGame\Util\DelayUtil.class
-org\leavesEventGame\Util\EliminationMessage.class
-org\leavesEventGame\Util\EventInfoDisplayer.class
-org\leavesEventGame\Util\Countdown$1.class
-org\leavesEventGame\Util\Countdown.class
