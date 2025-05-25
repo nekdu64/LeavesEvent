@@ -1,0 +1,21 @@
+﻿name: LeavesEventGame
+main: org.leavesEventGame.LeavesEventGame
+version: 1.0
+api-version: 1.21
+depend: [SimpleEventManager]
+
+commands:
+  leaves:
+    description: Commandes pour configurer l'arène Leaves
+    usage: /leaves setarena pos1|pos2 ou /leaves reload ou /leaves resetarena
+
+permissions:
+  leaves.setarena:
+    description: Autorise à configurer l'arène
+    default: op
+  leaves.reload:
+    description: Autorise à recharger la configuration
+    default: op
+  leaves.resetarena:
+    description: Autorise à reset l'arène
+    default: op

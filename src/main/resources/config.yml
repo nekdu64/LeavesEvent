@@ -1,0 +1,96 @@
+﻿arena:
+  pos1:
+    world: event
+    x: 16
+    y: 19
+    z: -252
+  pos2:
+    world: event
+    x: -16
+    y: -61
+    z: -284
+LeavesConfig:
+  Yes_Rico_Kaboom:
+    timeBetweenPhase: 5
+    Phase1:
+      delay: 30
+      randomtickspeed: 3
+      pvp: false
+      dispenser:
+        min: 1
+        max: 1
+        command:
+          - "summon minecraft:creeper ~ ~-5 ~"
+        command_description: "Creeper"
+    Phase2:
+      delay: 30
+      randomtickspeed: 5
+      pvp: true
+      dispenser:
+        min: 2
+        max: 3
+        command:
+          - "summon minecraft:creeper ~ ~-5 ~"
+        command_description: "Creeper"
+    Phase3:
+      delay: 30
+      randomtickspeed: 7
+      pvp: false
+      dispenser:
+        min: 6
+        max: 10
+        command:
+          - "summon minecraft:creeper ~ ~-5 ~"
+        command_description: "Creeper"
+    Phase4:
+      delay: 30
+      randomtickspeed: 10
+      pvp: true
+      dispenser:
+        min: 10
+        max: 15
+        command:
+          - "summon minecraft:creeper ~ ~-5 ~"
+        command_description: "Creeper"
+  Classico:
+    timeBetweenPhase: 5
+    Phase1:
+      delay: 30
+      randomtickspeed: 3
+      pvp: false
+      dispenser:
+        min: 0
+        max: 0
+        command:
+          - ""
+        command_description: ""
+    Phase2:
+      delay: 30
+      randomtickspeed: 6
+      pvp: true
+      dispenser:
+        min: 0
+        max: 0
+        command:
+          - ""
+        command_description: ""
+    Phase3:
+      delay: 30
+      randomtickspeed: 12
+      pvp: false
+      dispenser:
+        min: 0
+        max: 0
+        command:
+          - ""
+        command_description: ""
+    Phase4:
+      delay: 30
+      randomtickspeed: 25
+      pvp: true
+      dispenser:
+        min: 0
+        max: 0
+        command:
+          - ""
+        command_description: ""
