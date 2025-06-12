@@ -13,15 +13,17 @@ public class EventInfoDisplayer {
         Bukkit.broadcastMessage("");
         Bukkit.broadcastMessage(ChatColor.DARK_GREEN + "=== §a§lÉVÉNEMENT FEUILLE §r" + ChatColor.DARK_GREEN + "===");
         Bukkit.broadcastMessage("§aPhase "+phaseIndex);
-        Bukkit.broadcastMessage("§f⏱️ Durée phase : §e" + delay +"secondes");
-        Bukkit.broadcastMessage("§f🍃 RandomTickSpeed : §e" + randomTickSpeed);
-        Bukkit.broadcastMessage("§f⚔️ PVP activé : " + (pvp ? "§aOui" : "§cNon"));
-        Bukkit.broadcastMessage("§f📜 Largage : §e" + commandDescription);
+        Bukkit.broadcastMessage("§f Durée phase : §e" + delay +" secondes");
+        Bukkit.broadcastMessage("§f RandomTickSpeed : §e" + randomTickSpeed);
+        Bukkit.broadcastMessage("§f PVP activé : " + (pvp ? "§aOui" : "§cNon"));
+        if  (!commandDescription.isEmpty()){
+            Bukkit.broadcastMessage("§f Largage : §e" + commandDescription);
+        }
         Bukkit.broadcastMessage(ChatColor.DARK_GREEN + "===========================");
         Bukkit.broadcastMessage("");
 
         for (Player player : players) {
-            player.sendTitle("§a§lPhase: " + phaseIndex, "§ePvP: " + " X " + (pvp ? "§aOui" : "§cNon")+ " &eLargage: "+commandDescription, 10, 60, 20);
+            player.sendTitle("§a§lPhase: " + phaseIndex, "§ePvP: " + (pvp ? "§aOui" : "§cNon") + " §eLargage: " + commandDescription, 10, 60, 20);
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HARP, 1.0f, 0.5f);
         }
 

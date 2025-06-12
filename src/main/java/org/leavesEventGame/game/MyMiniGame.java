@@ -2,8 +2,12 @@ package org.leavesEventGame.game;
 
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Directional;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.scheduler.BukkitTask;
 import org.leavesEventGame.Util.Countdown;
 import org.leavesEventGame.Util.DelayUtil;
 import org.leavesEventGame.Util.EliminationMessage;
@@ -23,10 +27,12 @@ import org.leavesEventGame.LeavesEventGame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MyMiniGame implements Listener {
 
+    private BukkitTask waterCheckTask;
     private final DelayUtil delayUtil;
     private final Countdown countdown;
     private final List<Player> players;
@@ -34,12 +40,13 @@ public class MyMiniGame implements Listener {
     private final List<Player> ranking = new ArrayList<>();
     private final List<BlockState> originalBlocks = new ArrayList<>();
     private final LeavesEventGame plugin;
-    private Player winner;
+    public Player winner;
     public boolean running = false;
     private boolean Finale = false;
     private int startPlayerCount;
     private BossBar bossBar;
-
+    private List<Location> Alldispenser = new ArrayList<>();
+    private boolean pvp = false;
 
 
     public MyMiniGame(List<Player> players, LeavesEventGame plugin) {
@@ -54,12 +61,13 @@ public class MyMiniGame implements Listener {
 
     public void start(String Forceconfig) { // Start l'event
 
-
+        Bukkit.getPluginManager().registerEvents(MyMiniGame.this, plugin);
         //reference a mon manager
         SimpleEventManager sem = (SimpleEventManager) Bukkit.getPluginManager().getPlugin("SimpleEventManager");
         // Pour tp les joueurs au spawn de l'event grace au spawn set dans le manager avec /event setspawn Leaves
         Location loc = EventUtils.getEventSpawnLocation(sem, plugin.getEventName());
-        togglePvp(false,players);
+        pvp = false;
+        startWaterCheck();
         for (Player player : players) {
             player.teleport(loc);
         }
@@ -88,38 +96,50 @@ public class MyMiniGame implements Listener {
         }
 
         running = true;
-        pos1.getWorld().setGameRule(GameRule.DO_ENTITY_DROPS, false);
-
-        //Verification si config choisie existe sinon config aléatoire
-        List<String> ListConfig = (List<String>) plugin.getConfig().getList("LeavesConfig");
-        String Configchoisie;
-        Configchoisie = Forceconfig.isEmpty()||!ListConfig.contains(Forceconfig) ? Randomconfig() : Forceconfig;
-
+        pos1.getWorld().setDifficulty(Difficulty.EASY);
+        pos1.getWorld().setGameRule(GameRule.DO_TILE_DROPS, false);
+        pos1.getWorld().setGameRule(GameRule.RANDOM_TICK_SPEED, 0);
+// Vérifie si la config existe dans LeavesConfig, sinon sélectionne une config aléatoire
+        ConfigurationSection listConfig = plugin.getConfig().getConfigurationSection("LeavesConfig");
+        String configChoisie = null;
+        if (listConfig != null) {
+            for (String key : listConfig.getKeys(false)) {
+                if (key.equalsIgnoreCase(Forceconfig)) {
+                    configChoisie = key; // utiliser le vrai nom avec la bonne casse
+                    break;
+                }
+            }
+        }
+        if (configChoisie == null) {
+            configChoisie = plugin.Randomconfig();
+        }
         for (Player player : players) {
-            player.sendTitle("§c§lFeuilles", "§e"+Configchoisie, 10, 100, 20);
+            player.sendTitle("§c§lFeuilles", "§e"+configChoisie, 10, 100, 20);
         }
 
+        String finalConfigChoisie = configChoisie;
         delayUtil.delay(100, () -> {
 
             // Start Countdown -
-            countdown.startCountdown(players, 10, () -> {
+            countdown.startCountdownChat(players, 10, () -> {
                 // Instructions à exécuter une fois le décompte terminé
-                Bukkit.getPluginManager().registerEvents(MyMiniGame.this, plugin);
-                DépartLeaves(Configchoisie); //StartEvent
+                DépartLeaves("LeavesConfig."+finalConfigChoisie); //StartEvent
             });;
 
         });
     }
 
 
-    public void stop() {
+    public void normalstop() {
 
         Location pos1 = getLoc("arena.pos1");
         HandlerList.unregisterAll(this);
         String WorldEvent = pos1.getWorld().getName();
         Bukkit.getWorld(WorldEvent).setGameRule(GameRule.RANDOM_TICK_SPEED, 3);
-        Bukkit.getWorld(WorldEvent).setGameRule(GameRule.DO_ENTITY_DROPS, true);
-        togglePvp(true,players);
+        Bukkit.getWorld(WorldEvent).setGameRule(GameRule.DO_TILE_DROPS, true);
+        Bukkit.getWorld(WorldEvent).setDifficulty(Difficulty.PEACEFUL);
+        stopWaterCheck();
+        pvp = true;
         if (bossBar != null) {
             bossBar.removeAll();
             bossBar = null;
@@ -127,43 +147,41 @@ public class MyMiniGame implements Listener {
         delayUtil.delay(220, () -> {
             running = false;
             resetArena();
+            delayUtil.cancelAll(); // Stop toutes les tâches programmées
+            countdown.cancelAll(); // Stop toutes les tâches programmées
         });
+
     }
 
 
-    private String Randomconfig() {
-        List<String> ListConfig = (List<String>) plugin.getConfig().getList("LeavesConfig");
-        int randomNumber = (int) (Math.random() * ListConfig.size());//obtient un nombre entre 1 et nombre de config active
-        return "LeavesConfig."+ListConfig.get(randomNumber);
-    }
 
 
     private void DépartLeaves(String Configchoisie) {
 
-        List<String> ListPhases = (List<String>) plugin.getConfig().getList(Configchoisie);
+        ConfigurationSection ListPhases = plugin.getConfig().getConfigurationSection(Configchoisie);
         int totalDelay = 0;
-
+        int i= 0;
+        
         EventInfoDisplayer Chathandler = new EventInfoDisplayer();
-        for (int i = 0; i < ListPhases.size(); i++) {
+        for (String key : ListPhases.getKeys(false)) {
 
-            int phaseIndex = i + 1;
-            int delay = plugin.getConfig().getInt(Configchoisie + "Phase" + i + ".delay");
-            int delayintick = Math.max(20 * delay, 100); //on s'assure que delay est au moins a 5 seconde
-            int randomtickspeed = plugin.getConfig().getInt(Configchoisie + "Phase" + i + ".randomtickspeed");
-            boolean pvp = plugin.getConfig().getBoolean(Configchoisie + "Phase" + i + ".pvp");
-            int dispenserMin = plugin.getConfig().getInt(Configchoisie + "Phase" + i + ".dispenser.min");
-            int dispenserMax = plugin.getConfig().getInt(Configchoisie + "Phase" + i + ".dispenser.max");
-            String command = plugin.getConfig().getString(Configchoisie + "Phase" + i + ".command");
-            String commandDescription = plugin.getConfig().getString(Configchoisie + "Phase" + i + ".command_description");
-            int delayAfterTitle = 20 * plugin.getConfig().getInt(Configchoisie + ".timeBetweenPhase");
+            i++;
+            int phaseIndex = i;
+            int delay = plugin.getConfig().getInt(Configchoisie + ".Phase" + phaseIndex + ".delay");
+            int delayintick = Math.max(20 * delay, 160); //on s'assure que delay est au moins a 5 seconde
+            int randomtickspeed = plugin.getConfig().getInt(Configchoisie + ".Phase" + phaseIndex + ".randomtickspeed");
+            int dispenserMin = plugin.getConfig().getInt(Configchoisie + ".Phase" + phaseIndex + ".dispenser.min");
+            int dispenserMax = plugin.getConfig().getInt(Configchoisie + ".Phase" + phaseIndex + ".dispenser.max");
+            List<String> commands = (List<String>) plugin.getConfig().getList(Configchoisie + ".Phase" + phaseIndex + ".dispenser.command");
+            String commandDescription = plugin.getConfig().getString(Configchoisie + ".Phase" + phaseIndex + ".dispenser.command_description");
+            boolean pvptemp = plugin.getConfig().getBoolean(Configchoisie + ".Phase" + phaseIndex + ".pvp");
 
-
-            delayUtil.delay(totalDelay-100, () -> {
+            delayUtil.delay(totalDelay-160, () -> {
                 //Afficher les info de la prochaine vague dans le chat
-                Chathandler.afficherChat(players, phaseIndex, delay, randomtickspeed, pvp, commandDescription);
+                Chathandler.afficherChat(players, phaseIndex, delay, randomtickspeed, pvptemp, commandDescription);
 
-                countdown.startCountdown(players, 5, () -> {
-                    LauchNextPhase(delay,randomtickspeed,pvp,dispenserMax,dispenserMin,command);
+                countdown.startCountdown(players, 8, () -> {
+                    LauchNextPhase(delay,randomtickspeed,pvptemp,dispenserMax,dispenserMin,commands);
                 });
 
             });
@@ -172,16 +190,16 @@ public class MyMiniGame implements Listener {
         }
     }
 
-    private void LauchNextPhase(int delay,int randomtickspeed, boolean pvp, int dispenserMax, int dispenserMin, String command) {
+    private void LauchNextPhase(int delay,int randomtickspeed, boolean pvptemp, int dispenserMax, int dispenserMin, List<String> commands) {
         Location pos1 = getLoc("arena.pos1");
         Location pos2 = getLoc("arena.pos2");
         World world = pos1.getWorld();
 
         world.setGameRule(GameRule.RANDOM_TICK_SPEED, randomtickspeed);
-        togglePvp(pvp,players);
+        pvp = pvptemp ;
         int nbDispenser = ThreadLocalRandom.current().nextInt(dispenserMin, dispenserMax+1);
-
-
+        delay = 20*delay;
+        if (nbDispenser == 0 || commands.isEmpty()) {return;}
         // on récupère tous les bloc de leaves encore dans l'arene
         List<BlockState> leavesBlocks = new ArrayList<>();
         leavesBlocks.clear();
@@ -189,7 +207,7 @@ public class MyMiniGame implements Listener {
             for (int y = Math.min(pos1.getBlockY(), pos2.getBlockY()); y <= Math.max(pos1.getBlockY(), pos2.getBlockY()); y++) {
                 for (int z = Math.min(pos1.getBlockZ(), pos2.getBlockZ()); z <= Math.max(pos1.getBlockZ(), pos2.getBlockZ()); z++) {
                     Location blockLoc = new Location(world, x, y, z);
-                    if (blockLoc.getBlock().getType().equals(Material.OAK_LEAVES)) {
+                    if (blockLoc.getBlock().getType().toString().contains("LEAVES")) {
                         leavesBlocks.add(blockLoc.getBlock().getState());
                     }
                 }
@@ -197,7 +215,12 @@ public class MyMiniGame implements Listener {
         }
 
         //on place des dispenser random en y max au dessus de ces blocks de leaves choisi aléatoirement
-        List<Location> Alldispenser = new ArrayList<>();
+        //Enlève les anciens dispenser
+        for (Location oldLoc : Alldispenser) {
+            oldLoc.getBlock().setType(Material.AIR); // ou remettre des feuilles si tu préfères
+        }
+        Alldispenser.clear();
+
         int actualDispenserCount = Math.min(nbDispenser, leavesBlocks.size());
         Collections.shuffle(leavesBlocks); // mélange la liste comme ça le block 0 est random
         for (int i = 0; i < actualDispenserCount; i++) {
@@ -217,18 +240,19 @@ public class MyMiniGame implements Listener {
                 int x = commandLoc.getBlockX();
                 int y = commandLoc.getBlockY();
                 int z = commandLoc.getBlockZ();
+                Random random = new Random();
+                String command = commands.get(random.nextInt(commands.size()));
 
-                // Build de la commande correctement formatée
                 String fullCommand = String.format(
-                        "execute in minecraft:%s positioned %d %d %d run %s",
-                        world,
-                        x, y, z,
-                        command
+                        "execute in %s positioned %d %d %d run %s",
+                        world.getKey(), x, y, z, command
                 );
+
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), fullCommand);
+
                 for (Player player : players) {
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f);
                 }
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), fullCommand);
             }
         });
 
@@ -241,16 +265,25 @@ public class MyMiniGame implements Listener {
         bossBar.setProgress(progress);
         bossBar.setTitle("§eJoueurs restants : " + players.size());
     }
-    @EventHandler
-    public void onTouchWater(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        if (!players.contains(player)) return;
-        if (!running) return;
 
-        if (player.getLocation().getBlock().getType() == Material.WATER) {
-            eliminate(player);
+
+    public void startWaterCheck() {
+        waterCheckTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!running) return;
+            for (Player player : players) {
+                Material blockType = player.getLocation().getBlock().getType();
+                if (blockType == Material.WATER || blockType == Material.LAVA) {
+                    eliminate(player);
+                }
+            }
+        }, 0L, 10L); // tous les 10 ticks (0.5 sec)
+    }
+
+    public void stopWaterCheck() {
+        if (waterCheckTask != null) {
+            waterCheckTask.cancel();
+            waterCheckTask = null;
         }
-        // On utilise l'eau pour definir si un joueur est mort
     }
 
     public void eliminate(Player player) {
@@ -298,6 +331,7 @@ public class MyMiniGame implements Listener {
 
         if (lastPlayer != null && !ranking.contains(lastPlayer) && lastPlayer.isOnline()) {
             delayUtil.cancelAll(); // Stop toutes les tâches programmées
+            countdown.cancelAll(); // Stop toutes les tâches programmées
             winner = lastPlayer;
             // Limite les feux d'artifice à 3
             for (int i = 0; i < 3; i++) {
@@ -313,7 +347,7 @@ public class MyMiniGame implements Listener {
         }
 
         // Termine proprement le jeu après 7,5 secondes
-        stop();
+        normalstop();
 
 
     }
@@ -373,11 +407,57 @@ public class MyMiniGame implements Listener {
         // pas le droit de casser de blocs
         event.setCancelled(true);
     }
+    @EventHandler
+    public void onDamage(EntityDamageEvent event) {
 
-
-    private void togglePvp(boolean pvp, List<Player> players) {
-        for (Player player : players) {
-            player.setInvulnerable(!pvp);
+        if (event.getEntity() instanceof  Player) {
+            Player player = (Player) event.getEntity();
+            if (!players.contains(player)) return;
+            if (!running) return;
+            event.setDamage(0);
         }
+        else if (event.getEntity().getLocation().getWorld().getName().equals(players.getFirst().getWorld().getName())) {
+            event.setDamage(0);
+        }
+    }
+
+
+    @EventHandler
+    public void togglePvp(EntityDamageByEntityEvent event) {
+        if (!pvp) { // ta variable de contrôle du PvP
+
+            Entity damager = event.getDamager();
+            Entity victim = event.getEntity();
+
+            // Empêche uniquement les dégâts entre joueurs
+            if (damager instanceof Player && victim instanceof Player) {
+                event.setCancelled(true);
+                damager.sendMessage("§cPVP désactivé");
+            }
+        }
+    }
+
+    public void stop() {
+
+        Location pos1 = getLoc("arena.pos1");
+        HandlerList.unregisterAll(this);
+        String WorldEvent = pos1.getWorld().getName();
+        Bukkit.getWorld(WorldEvent).setGameRule(GameRule.RANDOM_TICK_SPEED, 3);
+        Bukkit.getWorld(WorldEvent).setGameRule(GameRule.DO_TILE_DROPS, true);
+        Bukkit.getWorld(WorldEvent).setDifficulty(Difficulty.PEACEFUL);
+        stopWaterCheck();
+        pvp = true;
+        if (bossBar != null) {
+            bossBar.removeAll();
+            bossBar = null;
+        }
+        delayUtil.delay(220, () -> {
+            running = false;
+            Bukkit.getWorld(WorldEvent).setDifficulty(Difficulty.EASY);
+            resetArena();
+            delayUtil.cancelAll(); // Stop toutes les tâches programmées
+            countdown.cancelAll(); // Stop toutes les tâches programmées
+        });
+
     }
 }

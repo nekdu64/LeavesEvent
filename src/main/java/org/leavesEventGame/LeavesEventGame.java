@@ -1,9 +1,9 @@
 package org.leavesEventGame;
 
-import org.apache.maven.model.PluginContainer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.simpleEventManager.api.EventGame;
@@ -11,7 +11,6 @@ import org.leavesEventGame.commands.SetArenaCommand;
 import org.leavesEventGame.game.MyMiniGame;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -23,6 +22,11 @@ public class LeavesEventGame extends JavaPlugin implements EventGame {
     public void onEnable() {
         this.getCommand("Leaves").setExecutor(new SetArenaCommand(this));
         getLogger().info("LeavesEvent enabled!");
+
+
+
+        // 🔒 Enregistrement du listener de protection des feuilles
+        Bukkit.getPluginManager().registerEvents(new org.leavesEventGame.Util.LeafDecayBlocker(this), this);
 
         // Sauvegarde le fichier config.yml depuis le JAR si non présent
         saveDefaultConfig();
@@ -57,7 +61,7 @@ public class LeavesEventGame extends JavaPlugin implements EventGame {
 
     @Override
     public void Removeplayer(Player player) {
-        if (game != null) {
+        if (game != null && game.winner==null) {
             game.eliminate(player);
         }
     }
@@ -76,19 +80,19 @@ public class LeavesEventGame extends JavaPlugin implements EventGame {
 
     @Override
     public void setMode(String mode) {
-        this.mode = (mode != null) ? mode.toLowerCase() : pickRandomMode();
+        this.mode = (mode != null) ? mode.toLowerCase() : Randomconfig();
     }
 
-    private String pickRandomMode() {
-        List<String> availableModes = new ArrayList<>();
-        for (int i = 1; i <= 10; i++) {
-            String name = getConfig().getString("LeavesConfig.Config" + i + ".Name");
-            if (name != null && !"NotUse".equalsIgnoreCase(name)) {
-                availableModes.add(name);
-            }
-        }
-        if (availableModes.isEmpty()) return "default";
-        return availableModes.get(new Random().nextInt(availableModes.size()));
+    public String Randomconfig() {
+        ConfigurationSection section = this.getConfig().getConfigurationSection("LeavesConfig");
+
+        if (section == null || section.getKeys(false).isEmpty()) return null;
+
+        List<String> keys = new ArrayList<>(section.getKeys(false));
+        int randomIndex = (int) (Math.random() * keys.size());
+        String chosenKey = keys.get(randomIndex);
+
+        return chosenKey;
     }
 
 
@@ -110,11 +114,15 @@ public class LeavesEventGame extends JavaPlugin implements EventGame {
                     if (blockLoc.getBlock().getType().toString().contains("Leaves")) {
                         blockLoc.getBlock().setType(Material.AIR); // 🧊 Tu enleve les Leaves
                     }
-                    if (blockLoc.getBlock().getType() == Material.GOLD_BLOCK) {
-                        blockLoc.getBlock().setType(Material.OAK_SLAB); // Tu enleve les blocks d'or
-                    }
                 }
             }
         }
+    }
+
+    public boolean isRunning() {
+        return game.running;
+    }
+    public MyMiniGame getGame() {
+        return game;
     }
 }
