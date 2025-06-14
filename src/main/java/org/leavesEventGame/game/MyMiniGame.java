@@ -42,7 +42,6 @@ public class MyMiniGame implements Listener {
     private final LeavesEventGame plugin;
     public Player winner;
     public boolean running = false;
-    private boolean Finale = false;
     private int startPlayerCount;
     private BossBar bossBar;
     private List<Location> Alldispenser = new ArrayList<>();
@@ -306,7 +305,7 @@ public class MyMiniGame implements Listener {
                 eliminationMessage.broadcastElimination(player,remaining);
                 endgame(players.getFirst());
 
-            } else if (remaining <= 0 && !Finale) {
+            } else if (remaining <= 0) {
                 Bukkit.broadcastMessage("§c[Leaves] Égalité ! IL FAUT UN VAINQUEUR....");
                 delayUtil.delay(80, () -> {
                     Bukkit.broadcastMessage("§c[Leaves] Égalité ! les jurées délibères");
@@ -451,13 +450,10 @@ public class MyMiniGame implements Listener {
             bossBar.removeAll();
             bossBar = null;
         }
-        delayUtil.delay(220, () -> {
-            running = false;
-            Bukkit.getWorld(WorldEvent).setDifficulty(Difficulty.EASY);
-            resetArena();
-            delayUtil.cancelAll(); // Stop toutes les tâches programmées
-            countdown.cancelAll(); // Stop toutes les tâches programmées
-        });
+        running = false;
+        resetArena();
+        delayUtil.cancelAll(); // Stop toutes les tâches programmées
+        countdown.cancelAll(); // Stop toutes les tâches programmées
 
     }
 }
